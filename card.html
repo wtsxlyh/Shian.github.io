@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>赦免卡</title>
+  <style>
+    /* 全局样式重置 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "楷体", "行楷", SimKai, serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+
+    /* 卡片容器 - 3D透视+放大偏转幅度 */
+    .card-container {
+      width: 80%;
+      max-width: 1200px;
+      perspective: 2000px;
+      /* 增强透视感，配合大偏转 */
+      margin-bottom: 30px;
+    }
+
+    .pardon-card {
+      position: relative;
+      width: 100%;
+      height: auto;
+      background: url('./card.png') no-repeat center;
+      background-size: contain;
+      aspect-ratio: 2276/1280;
+      cursor: pointer;
+      /* 多层叠加阴影，增强立体悬浮感 */
+      box-shadow:
+        0 15px 40px rgba(0, 0, 0, 0.3),
+        /* 外层模糊大阴影，营造远距感 */
+        0 8px 25px rgba(0, 0, 0, 0.25),
+        /* 中层阴影，强化厚度 */
+        0 4px 15px rgba(0, 0, 0, 0.2),
+        /* 内层阴影，贴近卡片 */
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+      /* 轻微内高光，模拟卡片反光 */
+      transform-style: preserve-3d;
+      transition: transform 0.15s ease-out;
+      /* 稍慢过渡，适配大偏转 */
+      transform-origin: center center;
+      /* 中心支点 */
+      overflow: visible !important;
+      /* 强制不遮挡 */
+      /* 轻微提升卡片，让阴影显示更完整 */
+      transform: translateY(-5px);
+    }
+
+    /* 鼠标悬浮时阴影再强化，交互感更强 */
+    .pardon-card:hover {
+      box-shadow:
+        0 20px 50px rgba(0, 0, 0, 0.35),
+        0 10px 30px rgba(0, 0, 0, 0.3),
+        0 5px 20px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    /* 功能按钮区域 */
+    .function-buttons {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 80%;
+      max-width: 800px;
+    }
+
+    .func-btn {
+      padding: 12px 24px;
+      font-size: 18px;
+      background-color: #fff;
+      border: 2px solid #D4AF37;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: "楷体", SimKai, serif;
+      /* 按钮也添加轻微阴影，和卡片风格统一 */
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .func-btn:hover {
+      background-color: #f8f0d7;
+      color: #8B7355;
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px);
+    }
+
+    /* 弹窗样式 */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      width: 80%;
+      max-width: 500px;
+      position: relative;
+      font-family: "微软雅黑", sans-serif;
+      /* 弹窗添加阴影，增强层级 */
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+      transition: color 0.2s ease;
+    }
+
+    .close-btn:hover {
+      color: #000;
+    }
+
+    /* 新增：使用赦免卡确认弹窗 */
+    .use-card-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.6);
+      z-index: 10001;
+      /* 层级高于普通弹窗 */
+      justify-content: center;
+      align-items: center;
+    }
+
+    .use-card-content {
+      background-color: #fff;
+      padding: 40px 30px;
+      border-radius: 12px;
+      width: 80%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .use-card-title {
+      font-size: 22px;
+      color: #333;
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+
+    .use-card-buttons {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      margin-top: 30px;
+    }
+
+    .confirm-btn,
+    .cancel-btn {
+      padding: 10px 30px;
+      border-radius: 8px;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .confirm-btn {
+      background-color: #D4AF37;
+      color: #fff;
+    }
+
+    .confirm-btn:hover {
+      background-color: #b89428;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 10px rgba(212, 175, 55, 0.3);
+    }
+
+    .cancel-btn {
+      background-color: #eee;
+      color: #666;
+    }
+
+    .cancel-btn:hover {
+      background-color: #ddd;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* 移动端适配：阴影适度调整，避免过于厚重 */
+    @media (max-width: 768px) {
+      .card-container {
+        width: 95%;
+      }
+
+      .pardon-card {
+        box-shadow:
+          0 10px 30px rgba(0, 0, 0, 0.25),
+          0 6px 20px rgba(0, 0, 0, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        transform: translateY(-3px);
+      }
+
+      .pardon-card:hover {
+        box-shadow:
+          0 15px 40px rgba(0, 0, 0, 0.3),
+          0 8px 25px rgba(0, 0, 0, 0.25),
+          inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      }
+
+      .use-card-content {
+        padding: 30px 20px;
+        width: 90%;
+      }
+
+      .use-card-title {
+        font-size: 20px;
+      }
+
+      .confirm-btn,
+      .cancel-btn {
+        padding: 8px 20px;
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- 卡片容器（已移除文字层） -->
+  <div class="card-container" id="cardContainer">
+    <div class="pardon-card" id="pardonCard">
+      <!-- 已删除“赦免卡”文字层 -->
+    </div>
+  </div>
+
+  <!-- 功能按钮区域 -->
+  <div class="function-buttons">
+    <button class="func-btn" data-modal="usage">使用方法</button>
+    <button class="func-btn" data-modal="balance">查看余量</button>
+    <button class="func-btn" data-modal="record">使用记录</button>
+  </div>
+
+  <!-- 使用方法弹窗 -->
+  <div class="modal" id="usage-modal">
+    <div class="modal-content">
+      <span class="close-btn">&times;</span>
+      <h2>使用方法</h2>
+      <p style="margin-top: 15px;">
+        1. 就在此页面，自己琢磨嘻嘻<br>
+        2. 目前仅供测试
+      </p>
+    </div>
+  </div>
+
+  <!-- 查看余量弹窗 -->
+  <div class="modal" id="balance-modal">
+    <div class="modal-content">
+      <span class="close-btn">&times;</span>
+      <h2>查看余量</h2>
+      <p style="margin-top: 15px;">
+        当前赦免卡剩余使用次数：<span id="card-balance">3</span>次<br>
+        有效期至：2099-12-31
+      </p>
+    </div>
+  </div>
+
+  <!-- 使用记录弹窗 -->
+  <div class="modal" id="record-modal">
+    <div class="modal-content">
+      <span class="close-btn">&times;</span>
+      <h2>使用记录</h2>
+      <div id="usage-record-list">
+        <p>
+          暂无使用记录</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新增：使用赦免卡确认弹窗 -->
+  <div class="use-card-modal" id="useCardModal">
+    <div class="use-card-content">
+      <div class="use-card-title">是否使用赦免卡？</div>
+      <p>确认后将消耗1次使用次数，剩余次数将实时更新</p>
+      <div class="use-card-buttons">
+        <button class="confirm-btn" id="confirmUseBtn">确定</button>
+        <button class="cancel-btn" id="cancelUseBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 新增：核心状态管理
+    let clickCount = 0; // 卡片点击次数
+    let cardBalance = 3; // 初始余量
+    const CLICK_TRIGGER_NUM = 5; // 触发使用提示的点击次数
+
+    // 1. 核心：正确的向里偏转效果（保留所有交互逻辑）
+    const cardContainer = document.getElementById('cardContainer');
+    const card = document.getElementById('pardonCard');
+
+    // 实时获取卡片尺寸（避免窗口缩放后计算错误）
+    function getCardCenter() {
+      const rect = card.getBoundingClientRect();
+      return {
+        x: rect.width / 2,
+        y: rect.height / 2,
+        rect: rect
+      };
+    }
+
+    // 鼠标移动：向里偏转逻辑
+    card.addEventListener('mousemove', (e) => {
+      const { x: centerX, y: centerY, rect } = getCardCenter();
+      const mouseX = e.clientX - rect.left - centerX;
+      const mouseY = e.clientY - rect.top - centerY;
+
+      const rotateY = (mouseX / centerX) * 6;
+      const rotateX = (mouseY / centerY) * -6;
+
+      card.style.transform = `translateY(-5px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    });
+
+    // 鼠标离开：恢复原位（保留轻微上移）
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = 'translateY(-5px) rotateX(0deg) rotateY(0deg)';
+    });
+
+    // 移动端触摸：同步向里偏转
+    card.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      const { x: centerX, y: centerY, rect } = getCardCenter();
+      const touch = e.touches[0];
+      const touchX = touch.clientX - rect.left - centerX;
+      const touchY = touch.clientY - rect.top - centerY;
+
+      const rotateY = (touchX / centerX) * 6;
+      const rotateX = (touchY / centerY) * -6;
+
+      // 移动端适配上移距离
+      const translateY = window.innerWidth <= 768 ? -3 : -5;
+      card.style.transform = `translateY(${translateY}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    });
+
+    // 移动端触摸结束：恢复原位
+    card.addEventListener('touchend', () => {
+      const translateY = window.innerWidth <= 768 ? -3 : -5;
+      card.style.transform = `translateY(${translateY}px) rotateX(0deg) rotateY(0deg)`;
+    });
+
+    // 窗口缩放时重新计算卡片中心
+    window.addEventListener('resize', () => {
+      getCardCenter();
+      // 缩放后重置卡片上移距离
+      const translateY = window.innerWidth <= 768 ? -3 : -5;
+      card.style.transform = `translateY(${translateY}px) rotateX(0deg) rotateY(0deg)`;
+    });
+
+    // 新增：卡片点击计数逻辑
+    card.addEventListener('click', () => {
+      // 余量为0时，直接提示无法使用
+      if (cardBalance <= 0) {
+        alert('赦免卡余量已用尽，无法使用！');
+        return;
+      }
+
+      clickCount++;
+      // 点击次数达到5次时触发确认弹窗
+      if (clickCount === CLICK_TRIGGER_NUM) {
+        document.getElementById('useCardModal').style.display = 'flex';
+        clickCount = 0; // 重置计数
+      }
+    });
+
+    // 新增：确认使用赦免卡逻辑
+    document.getElementById('confirmUseBtn').addEventListener('click', () => {
+      // 消耗1次余量
+      cardBalance--;
+      // 更新余量显示
+      document.getElementById('card-balance').textContent = cardBalance;
+      // 添加使用记录
+      addUsageRecord();
+      // 关闭确认弹窗
+      document.getElementById('useCardModal').style.display = 'none';
+      // 提示使用成功
+      alert(`赦免卡使用成功！剩余次数：${cardBalance}次`);
+    });
+
+    // 新增：取消使用赦免卡逻辑
+    document.getElementById('cancelUseBtn').addEventListener('click', () => {
+      document.getElementById('useCardModal').style.display = 'none';
+    });
+
+    // 新增：添加使用记录
+    function addUsageRecord() {
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const newRecord = `<p>${dateStr} ${timeStr}：使用赦免卡1次</p>`;
+
+      const recordList = document.getElementById('usage-record-list');
+      // 插入到记录列表顶部
+      recordList.innerHTML = newRecord + recordList.innerHTML;
+    }
+
+    // 2. 原有弹窗功能（完全保留）
+    const buttons = document.querySelectorAll('.func-btn');
+    const modals = document.querySelectorAll('.modal');
+    const closeBtns = document.querySelectorAll('.close-btn');
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const modalId = `${btn.dataset.modal}-modal`;
+        document.getElementById(modalId).style.display = 'flex';
+      });
+    });
+
+    closeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.closest('.modal').style.display = 'none';
+      });
+    });
+
+    window.addEventListener('click', (e) => {
+      if (e.target.classList.contains('modal')) {
+        e.target.style.display = 'none';
+      }
+    });
+
+    // 点击使用确认弹窗外层关闭弹窗
+    window.addEventListener('click', (e) => {
+      if (e.target.classList.contains('use-card-modal')) {
+        e.target.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+
+</html>
